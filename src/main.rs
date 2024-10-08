@@ -2,40 +2,13 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 use rosbag::{ChunkRecord, MessageRecord, RosBag};
 use std::{fs, io::Write};
 
-#[derive(Debug, Clone)]
-struct Time {
-    sec: i32,
-    nsec: u32,
-}
+mod messages;
 
-#[derive(Debug)]
-struct Event {
-    x: u16,
-    y: u16,
-    ts: Time,
-    polarity: bool,
-}
-
-#[derive(Debug)]
-struct Header {
-    seq: u32,
-    stamp: Time,
-    frame_id: String,
-}
-
-#[derive(Debug)]
-struct EventArray {
-    header: Header,
-    height: u32,
-    width: u32,
-    events: Vec<Event>,
-}
-
-fn read_event_array_from_bytes(data: &[u8]) -> EventArray {
+fn read_event_array_from_bytes(data: &[u8]) -> messages::EventArray {
     let mut cursor = std::io::Cursor::new(data);
-    let header = Header {
+    let header = messages::Header {
         seq: cursor.read_u32::<byteorder::LittleEndian>().unwrap(),
-        stamp: Time {
+        stamp: messages::Time {
             sec: cursor.read_i32::<byteorder::LittleEndian>().unwrap(),
             nsec: cursor.read_u32::<byteorder::LittleEndian>().unwrap(),
         },
@@ -53,17 +26,17 @@ fn read_event_array_from_bytes(data: &[u8]) -> EventArray {
     let num_events = cursor.read_u32::<byteorder::LittleEndian>().unwrap();
     let mut events = Vec::with_capacity(num_events as usize);
     for _ in 0..num_events {
-        events.push(Event {
+        events.push(messages::Event {
             x: cursor.read_u16::<byteorder::LittleEndian>().unwrap(),
             y: cursor.read_u16::<byteorder::LittleEndian>().unwrap(),
-            ts: Time {
+            ts: messages::Time {
                 sec: cursor.read_i32::<byteorder::LittleEndian>().unwrap(),
                 nsec: cursor.read_u32::<byteorder::LittleEndian>().unwrap(),
             },
             polarity: cursor.read_u8().unwrap() != 0,
         });
     }
-    EventArray {
+    messages::EventArray {
         header,
         height,
         width,
@@ -72,7 +45,7 @@ fn read_event_array_from_bytes(data: &[u8]) -> EventArray {
 }
 
 fn events_to_buffer(
-    events: &Vec<Event>,
+    events: &Vec<messages::Event>,
     frame_buffer: &mut Vec<u8>,
     width: u32,
     height: u32,
@@ -89,6 +62,14 @@ fn events_to_buffer(
 
 const HEIGHT: u32 = 480;
 const WIDTH: u32 = 640;
+
+// TODO: Create a new pipeline that:
+// 1. Reads the mp4 file
+// 2. Extracts the frames, scales them down to 640x480
+// 3. Extracts the timestamps
+// 4. Reads the ros bag file
+// 5. Extracts the events as per the frame timestamps
+// 6. Writes the events and frames to a binary file
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
