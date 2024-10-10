@@ -26,3 +26,10 @@ pub struct EventArray {
     pub width: u32,
     pub events: Vec<Event>,
 }
+
+impl Time {
+    pub fn msec(&self) -> u64 {
+        let res = ((self.sec as f32) * 1e3 + (self.nsec as f32) * 1e-6);
+        return res as u64;
+    }
+}
