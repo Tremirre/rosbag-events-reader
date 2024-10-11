@@ -11,14 +11,6 @@ const HEIGHT: u32 = 480;
 const WIDTH: u32 = 640;
 const MAX_EVENTS_PER_FRAME: usize = 10_000_000;
 
-// TODO: Create a new pipeline that:
-// 1. Reads the mp4 file
-// 2. Extracts the frames, scales them down to 640x480
-// 3. Extracts the timestamps
-// 4. Reads the ros bag file
-// 5. Extracts the events as per the frame timestamps
-// 6. Writes the events and frames to a binary file
-
 fn parse_args() -> (String, String, String) {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 4 {
@@ -36,7 +28,6 @@ fn main() {
         Err(e) => eprintln!("Error initializing ffmpeg: {}", e),
     }
 
-    // ==== FRAMES ===
     let mut ictx = ffmpeg::format::input(&mp4_filename).unwrap();
     let input = ictx.streams().best(Type::Video).unwrap();
     let video_stream_index = input.index();
@@ -53,7 +44,6 @@ fn main() {
     )
     .unwrap();
 
-    // ==== EVENTS ===
     let bag = RosBag::new(&bag_filename).unwrap();
     let mut frame = ffmpeg::util::frame::Video::empty();
     let mut frame_rgb = ffmpeg::util::frame::Video::empty();
@@ -102,7 +92,6 @@ fn main() {
             if event_ts > frame_ts {
                 // TODO: analyze if using message timestamp is sufficient
 
-                // export
                 let now = std::time::Instant::now();
                 let output = format!("{}_{}.bin", output, frame_idx);
                 export::export_frame_with_events(
@@ -112,7 +101,7 @@ fn main() {
                     used_event_bytes,
                 );
                 total_time_exporting += now.elapsed().as_micros();
-                // read next frame
+
                 let now = std::time::Instant::now();
                 let parse_res = ffmpegwrap::parse_next_frame(
                     video_stream_index as i32,
