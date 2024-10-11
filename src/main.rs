@@ -1,4 +1,6 @@
-use rosbag::{ChunkRecord, MessageRecord, MessageRecordsIterator, RosBag};
+extern crate ffmpeg_next as ffmpeg;
+use ffmpeg::media::Type;
+use rosbag::RosBag;
 use std::{fs, io::Write};
 
 mod messages;
@@ -15,33 +17,92 @@ const WIDTH: u32 = 640;
 // 5. Extracts the events as per the frame timestamps
 // 6. Writes the events and frames to a binary file
 
-fn main() {
+fn frame_to_buffer<'a>(frame: &'a ffmpeg::util::frame::Video) -> Vec<u8> {
+    let width = frame.width() as usize;
+    let height = frame.height() as usize;
+    let stride = frame.stride(0);
+    let mut frame_data = vec![0; width * height * 3];
+    for y in 0..height {
+        for x in 0..width {
+            let src_idx = y * stride + x * 3;
+            let dst_idx = y * width * 3 + x * 3;
+            frame_data[dst_idx] = frame.data(0)[src_idx];
+            frame_data[dst_idx + 1] = frame.data(0)[src_idx + 1];
+            frame_data[dst_idx + 2] = frame.data(0)[src_idx + 2];
+        }
+    }
+    frame_data
+}
+
+fn parse_args() -> (String, String, String) {
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 4 {
         eprintln!("Usage: {} <bag-file> <mp4-file> <output>", args[0]);
         std::process::exit(1);
     }
-    let bag_filename = &args[1];
+    (args[1].clone(), args[2].clone(), args[3].clone())
+}
 
+fn main() {
+    let (bag_filename, mp4_filename, output) = parse_args();
+
+    match ffmpeg::init() {
+        Ok(_) => println!("FFmpeg initialized"),
+        Err(e) => eprintln!("Error initializing ffmpeg: {}", e),
+    }
+
+    // ==== FRAMES ===
+    let mut ictx = ffmpeg::format::input(&mp4_filename).unwrap();
+    let input = ictx.streams().best(Type::Video).unwrap();
+    let vide_stream_index = input.index();
+    let ctx_decoder = ffmpeg::codec::context::Context::from_parameters(input.parameters()).unwrap();
+    let mut decoder = ctx_decoder.decoder().video().unwrap();
+    let mut scaler = ffmpeg::software::scaling::context::Context::get(
+        decoder.format(),
+        decoder.width(),
+        decoder.height(),
+        ffmpeg::format::Pixel::RGB24,
+        WIDTH,
+        HEIGHT,
+        ffmpeg::software::scaling::flag::Flags::BILINEAR,
+    )
+    .unwrap();
+
+    // ==== EVENTS ===
     let bag = RosBag::new(&bag_filename).unwrap();
-    let msg_count = bag
-        .chunk_records()
-        .map(|r| {
-            if let Ok(ChunkRecord::Chunk(chunk)) = r {
-                chunk.messages().count()
-            } else {
-                0
-            }
-        })
-        .sum::<usize>();
-
-    println!("Total messages: {}", msg_count);
-
+    let mut frame = ffmpeg::util::frame::Video::empty();
+    let mut frame_rgb = ffmpeg::util::frame::Video::empty();
     let mut events = Vec::<messages::Event>::new();
 
-    println!("Reading messages");
+    let mut frame_idx = 0;
 
-    // use the iterator to get the events
+    for (stream, packet) in ictx.packets() {
+        if stream.index() == vide_stream_index {
+            let _ = decoder.send_packet(&packet);
+            let decoded = decoder.receive_frame(&mut frame);
+            if decoded.is_err() {
+                continue;
+            }
+            let _ = scaler.run(&frame, &mut frame_rgb);
+            let frame_rgb = &frame_rgb;
+            let output_file = format!("{}/frame_{}.rgb", output, frame_idx);
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(&output_file)
+                .unwrap();
+
+            let frame_data = frame_to_buffer(&frame_rgb);
+            file.write_all(&frame_data).unwrap();
+
+            frame_idx += 1;
+            if frame_idx % 100 == 0 {
+                println!("Processed {} frames", frame_idx);
+            }
+        }
+    }
+    let _ = decoder.send_eof();
+
     let mut i = 0;
     let chunks = roswrap::chunk_iter(&bag);
     chunks.for_each(|chunk| {
