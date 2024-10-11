@@ -34,21 +34,27 @@ impl Time {
         let res = (self.sec as f32) * 1e3 + (self.nsec as f32) * 1e-6;
         return res as u64;
     }
+
+    pub fn microsec(&self) -> u64 {
+        let res = (self.sec as f32) * 1e6 + (self.nsec as f32) * 1e-3;
+        return res as u64;
+    }
 }
 
 impl Event {
     pub fn to_buffer(&self, buffer: &mut Vec<u8>, buffer_offset: u32) -> u32 {
         let indexable_offset = buffer_offset as usize;
         let msec = self.ts.msec();
-        assert!(msec > 0xFFFF);
+        assert!(buffer.len() >= indexable_offset + SERIALIZED_EVENT_SIZE as usize);
+        assert!(msec < 1 << 24);
         buffer[indexable_offset] = (msec & 0xFF) as u8;
         buffer[indexable_offset + 1] = (msec >> 8) as u8;
-        buffer[indexable_offset + 2] = (self.x & 0xFF) as u8;
-        buffer[indexable_offset + 3] = (self.x >> 8) as u8;
-        buffer[indexable_offset + 4] = (self.y & 0xFF) as u8;
-        buffer[indexable_offset + 5] = (self.y >> 8) as u8;
-        buffer[indexable_offset + 6] = if self.polarity { 1 } else { 0 };
-        buffer[indexable_offset + 7] = 0;
+        buffer[indexable_offset + 2] = (msec >> 16) as u8;
+        buffer[indexable_offset + 3] = (self.x & 0xFF) as u8;
+        buffer[indexable_offset + 4] = (self.x >> 8) as u8;
+        buffer[indexable_offset + 5] = (self.y & 0xFF) as u8;
+        buffer[indexable_offset + 6] = (self.y >> 8) as u8;
+        buffer[indexable_offset + 7] = if self.polarity { 1 } else { 0 };
         buffer_offset + SERIALIZED_EVENT_SIZE
     }
 }

@@ -14,7 +14,6 @@ pub fn export_frame_with_events(
     let mut output = fs::OpenOptions::new()
         .create(true)
         .write(true)
-        .append(true)
         .open(output_path)
         .unwrap();
 

@@ -25,8 +25,8 @@ pub fn read_event_array_from_bytes(data: &[u8]) -> messages::EventArray {
     let num_events = cursor.read_u32::<byteorder::LittleEndian>().unwrap();
     let mut events = Vec::with_capacity(num_events as usize);
     for _ in 0..num_events {
-        let x = width as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap();
-        let y = height as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap();
+        let x = width as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap() - 1;
+        let y = height as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap() - 1;
         events.push(messages::Event {
             x,
             y,
@@ -72,8 +72,8 @@ pub fn read_events_from_raw_events_array_msg_to_buffer(
     let num_events = cursor.read_u32::<byteorder::LittleEndian>().unwrap();
     let mut offset = used_event_bytes;
     for _ in 0..num_events {
-        let x = width as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap();
-        let y = height as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap();
+        let x = width as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap() - 1;
+        let y = height as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap() - 1;
         let event = messages::Event {
             x,
             y,
