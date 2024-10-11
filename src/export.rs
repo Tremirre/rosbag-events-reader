@@ -1,5 +1,6 @@
 extern crate ffmpeg_next as ffmpeg;
 
+use crate::messages;
 use byteorder::WriteBytesExt;
 use ffmpeg::util::frame::Video;
 use std::{fs, io::Write};
@@ -24,7 +25,7 @@ pub fn export_frame_with_events(
         .write_u32::<byteorder::LittleEndian>(frame_rgb.height() as u32)
         .unwrap();
     output
-        .write_u32::<byteorder::LittleEndian>(used_event_bytes / 8)
+        .write_u32::<byteorder::LittleEndian>(used_event_bytes / messages::SERIALIZED_EVENT_SIZE)
         .unwrap();
 
     output.write_all(frame_rgb.data(0)).unwrap();

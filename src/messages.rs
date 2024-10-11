@@ -41,14 +41,14 @@ impl Event {
         let indexable_offset = buffer_offset as usize;
         let msec = self.ts.msec();
         assert!(msec > 0xFFFF);
-        buffer[indexable_offset] = (msec >> 8) as u8;
-        buffer[indexable_offset + 1] = (msec & 0xFF) as u8;
-        buffer[indexable_offset + 2] = (self.x >> 8) as u8;
-        buffer[indexable_offset + 3] = (self.x & 0xFF) as u8;
-        buffer[indexable_offset + 4] = (self.y >> 8) as u8;
-        buffer[indexable_offset + 5] = (self.y & 0xFF) as u8;
-        buffer[indexable_offset + 6] = 0;
-        buffer[indexable_offset + 7] = if self.polarity { 1 } else { 0 };
+        buffer[indexable_offset] = (msec & 0xFF) as u8;
+        buffer[indexable_offset + 1] = (msec >> 8) as u8;
+        buffer[indexable_offset + 2] = (self.x & 0xFF) as u8;
+        buffer[indexable_offset + 3] = (self.x >> 8) as u8;
+        buffer[indexable_offset + 4] = (self.y & 0xFF) as u8;
+        buffer[indexable_offset + 5] = (self.y >> 8) as u8;
+        buffer[indexable_offset + 6] = if self.polarity { 1 } else { 0 };
+        buffer[indexable_offset + 7] = 0;
         buffer_offset + SERIALIZED_EVENT_SIZE
     }
 }
