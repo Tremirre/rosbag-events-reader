@@ -4,6 +4,8 @@ pub struct Time {
     pub nsec: u32,
 }
 
+pub const SERIALIZED_EVENT_SIZE: u32 = 8;
+
 #[derive(Debug)]
 pub struct Event {
     pub x: u16,
@@ -29,7 +31,24 @@ pub struct EventArray {
 
 impl Time {
     pub fn msec(&self) -> u64 {
-        let res = ((self.sec as f32) * 1e3 + (self.nsec as f32) * 1e-6);
+        let res = (self.sec as f32) * 1e3 + (self.nsec as f32) * 1e-6;
         return res as u64;
+    }
+}
+
+impl Event {
+    pub fn to_buffer(&self, buffer: &mut Vec<u8>, buffer_offset: u32) -> u32 {
+        let indexable_offset = buffer_offset as usize;
+        let msec = self.ts.msec();
+        assert!(msec > 0xFFFF);
+        buffer[indexable_offset] = (msec >> 8) as u8;
+        buffer[indexable_offset + 1] = (msec & 0xFF) as u8;
+        buffer[indexable_offset + 2] = (self.x >> 8) as u8;
+        buffer[indexable_offset + 3] = (self.x & 0xFF) as u8;
+        buffer[indexable_offset + 4] = (self.y >> 8) as u8;
+        buffer[indexable_offset + 5] = (self.y & 0xFF) as u8;
+        buffer[indexable_offset + 6] = 0;
+        buffer[indexable_offset + 7] = if self.polarity { 1 } else { 0 };
+        buffer_offset + SERIALIZED_EVENT_SIZE
     }
 }
