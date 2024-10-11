@@ -16,7 +16,33 @@ const WIDTH: u32 = 640;
 // 4. Reads the ros bag file
 // 5. Extracts the events as per the frame timestamps
 // 6. Writes the events and frames to a binary file
+struct Timestamp {
+    raw: i64,
+    seconds: f64,
+    milliseconds: i64,
+    timebase: ffmpeg::Rational,
+}
 
+impl Timestamp {
+    fn from_frame(
+        frame: &ffmpeg::util::frame::Video,
+        stream: &ffmpeg_next::Stream,
+    ) -> Option<Self> {
+        frame.timestamp().map(|ts| {
+            let timebase = stream.time_base();
+            let seconds =
+                ts as f64 * f64::from(timebase.numerator()) / f64::from(timebase.denominator());
+            let milliseconds = (seconds * 1000.0) as i64;
+
+            Self {
+                raw: ts,
+                seconds,
+                milliseconds,
+                timebase,
+            }
+        })
+    }
+}
 fn frame_to_buffer<'a>(frame: &'a ffmpeg::util::frame::Video) -> Vec<u8> {
     let width = frame.width() as usize;
     let height = frame.height() as usize;
@@ -83,6 +109,9 @@ fn main() {
             if decoded.is_err() {
                 continue;
             }
+
+            let ts = Timestamp::from_frame(&frame, &stream).unwrap();
+            println!("Frame {}: {}", frame_idx, ts.milliseconds);
             let _ = scaler.run(&frame, &mut frame_rgb);
             let frame_rgb = &frame_rgb;
             let output_file = format!("{}/frame_{}.rgb", output, frame_idx);
@@ -96,9 +125,9 @@ fn main() {
             file.write_all(&frame_data).unwrap();
 
             frame_idx += 1;
-            if frame_idx % 100 == 0 {
-                println!("Processed {} frames", frame_idx);
-            }
+            // if frame_idx % 100 == 0 {
+            //     println!("Processed {} frames", frame_idx);
+            // }
         }
     }
     let _ = decoder.send_eof();
