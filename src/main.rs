@@ -93,7 +93,8 @@ fn main() {
                 // TODO: analyze if using message timestamp is sufficient
 
                 let now = std::time::Instant::now();
-                let output = format!("{}_{}.bin", output, frame_idx);
+                let frame_idx_padded = format!("{:05}", frame_idx);
+                let output = format!("{}_{}.bin", output, frame_idx_padded);
                 export::export_frame_with_events(
                     &frame_rgb,
                     &event_buffer,
