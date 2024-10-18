@@ -3,7 +3,7 @@ use byteorder::ReadBytesExt;
 use rosbag::record_types::{Chunk, MessageData};
 use rosbag::{ChunkRecord, MessageRecord, RosBag};
 
-pub fn read_event_array_from_bytes(data: &[u8]) -> messages::EventArray {
+pub fn read_event_array_from_bytes(data: &[u8], meta_only: bool) -> messages::EventArray {
     let mut cursor = std::io::Cursor::new(data);
     let header = messages::Header {
         seq: cursor.read_u32::<byteorder::LittleEndian>().unwrap(),
@@ -23,7 +23,16 @@ pub fn read_event_array_from_bytes(data: &[u8]) -> messages::EventArray {
     let height = cursor.read_u32::<byteorder::LittleEndian>().unwrap();
     let width = cursor.read_u32::<byteorder::LittleEndian>().unwrap();
     let num_events = cursor.read_u32::<byteorder::LittleEndian>().unwrap();
-    let mut events = Vec::with_capacity(num_events as usize);
+    let capacity = if meta_only { 0 } else { num_events as usize };
+    let mut events = Vec::with_capacity(capacity);
+    if meta_only {
+        return messages::EventArray {
+            header,
+            height,
+            width,
+            events,
+        };
+    }
     for _ in 0..num_events {
         let x = width as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap() - 1;
         let y = height as u16 - cursor.read_u16::<byteorder::LittleEndian>().unwrap() - 1;
@@ -49,7 +58,7 @@ pub fn read_events_from_raw_events_array_msg_to_buffer(
     data: &[u8],
     events_buffer: &mut Vec<u8>,
     used_event_bytes: u32,
-) -> (u32, u64) {
+) -> u32 {
     let mut cursor = std::io::Cursor::new(data);
 
     let header = messages::Header {
@@ -85,7 +94,7 @@ pub fn read_events_from_raw_events_array_msg_to_buffer(
         };
         offset = event.to_buffer(events_buffer, offset);
     }
-    (offset, header.stamp.msec())
+    offset
 }
 
 pub fn chunk_iter(bag: &RosBag) -> impl Iterator<Item = Chunk> {
