@@ -1,6 +1,5 @@
 use rosbag::RosBag;
 
-mod export;
 mod messages;
 mod roswrap;
 use byteorder::WriteBytesExt;
@@ -15,7 +14,7 @@ fn parse_args() -> (String, String) {
     (args[1].clone(), args[2].clone())
 }
 
-const MAX_EVENTS_PER_MESSAGE: u32 = 1_000_000;
+const MAX_EVENTS_PER_MESSAGE: u32 = 800_000;
 
 fn main() {
     let (bag_filename, output_file) = parse_args();
@@ -31,7 +30,7 @@ fn main() {
     let mut output = fs::OpenOptions::new()
         .create(true)
         .write(true)
-        .open(output_file)
+        .open(output_file.clone())
         .unwrap();
 
     let mut width: u32 = 0;
@@ -53,7 +52,6 @@ fn main() {
             );
 
             total_events += used_event_bytes / messages::SERIALIZED_EVENT_SIZE;
-            println!("Used {} bytes", used_event_bytes);
 
             output
                 .write_all(&event_buffer[..used_event_bytes as usize])
@@ -67,6 +65,7 @@ fn main() {
         }
     }
 
+    println!("Done! Parsed events: {}", total_events);
     output
         .write_u16::<byteorder::LittleEndian>(width as u16)
         .unwrap();
@@ -76,4 +75,6 @@ fn main() {
     output
         .write_u32::<byteorder::LittleEndian>(total_events)
         .unwrap();
+
+    println!("Data written to {}", output_file);
 }
